@@ -110,3 +110,39 @@ export function validateProductInput(
     data: { name, description, brand_id, default_uom_id },
   };
 }
+
+/**
+ * Validates search query input for catalog lookups.
+ * Enforces string type, trims whitespace, and limits max query length.
+ */
+export function validateSearchQuery(
+  queryRaw: unknown,
+  maxLength = 100
+): ValidationOutput<{ query: string }> {
+  if (typeof queryRaw !== "string") {
+    return {
+      success: false,
+      error: "Search query must be a string.",
+      fieldErrors: { query: ["Invalid query format."] },
+    };
+  }
+
+  const query = queryRaw.trim();
+  if (query.length > maxLength) {
+    return {
+      success: false,
+      error: `Search query cannot exceed ${maxLength} characters.`,
+      fieldErrors: { query: [`Query exceeds maximum length of ${maxLength}.`] },
+    };
+  }
+
+  return { success: true, data: { query } };
+}
+
+/**
+ * Safely sanitizes search query for SQL/PostgREST ilike pattern matching.
+ * Escapes %, _, and \ characters to prevent regex/wildcard injection.
+ */
+export function sanitizeSearchQuery(query: string): string {
+  return query.replace(/[%_\\]/g, "\\$&");
+}

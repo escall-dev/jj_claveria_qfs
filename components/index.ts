@@ -6,4 +6,4 @@
  * - Client Components ('use client') strictly scoped for interactive forms, dynamic rows, autocomplete, and live calculations.
  */
 
-export {};
+export * from "./catalog";

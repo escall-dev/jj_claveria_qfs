@@ -1,6 +1,35 @@
 import { supabase } from "@/lib/supabase";
-import type { UOM, CreateUomInput, UpdateUomInput } from "@/types/catalog";
+import type {
+  UOM,
+  UomLookupResult,
+  CreateUomInput,
+  UpdateUomInput,
+} from "@/types/catalog";
 import { validateUomInput } from "@/lib/validations/catalog";
+
+/**
+ * Lists all active Units of Measure for new quotation items.
+ * Strictly filters out inactive records to prevent selection of obsolete units.
+ */
+export async function listActiveUoms(): Promise<UomLookupResult[]> {
+  const { data, error } = await supabase
+    .from("uoms")
+    .select("id, name, abbreviation, active")
+    .eq("active", true)
+    .order("name", { ascending: true });
+
+  if (error) {
+    console.error("Error listing active UOMs:", error);
+    return [];
+  }
+
+  return (data || []).map((u) => ({
+    id: u.id,
+    name: u.name,
+    abbreviation: u.abbreviation ?? null,
+    active: Boolean(u.active),
+  }));
+}
 
 export async function listUoms(options?: {
   search?: string;

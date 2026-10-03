@@ -1,6 +1,54 @@
 import { supabase } from "@/lib/supabase";
-import type { Brand, CreateBrandInput, UpdateBrandInput } from "@/types/catalog";
-import { validateBrandName } from "@/lib/validations/catalog";
+import type {
+  Brand,
+  BrandLookupResult,
+  CreateBrandInput,
+  UpdateBrandInput,
+} from "@/types/catalog";
+import {
+  validateBrandName,
+  validateSearchQuery,
+  sanitizeSearchQuery,
+} from "@/lib/validations/catalog";
+
+/**
+ * Searches brands for autocomplete lookups.
+ * Case-insensitive, partial-match, trimmed, database-backed, and limited.
+ */
+export async function searchBrands(
+  query: string,
+  limit = 10
+): Promise<BrandLookupResult[]> {
+  const validation = validateSearchQuery(query);
+  if (!validation.success || !validation.data) {
+    return [];
+  }
+
+  const trimmedQuery = validation.data.query;
+  if (!trimmedQuery) {
+    return [];
+  }
+
+  const safeLimit = Math.min(Math.max(1, limit), 50);
+  const sanitized = sanitizeSearchQuery(trimmedQuery);
+
+  const { data, error } = await supabase
+    .from("brands")
+    .select("id, name")
+    .ilike("name", `%${sanitized}%`)
+    .order("name", { ascending: true })
+    .limit(safeLimit);
+
+  if (error) {
+    console.error("Error searching brands:", error);
+    return [];
+  }
+
+  return (data || []).map((b) => ({
+    id: b.id,
+    name: b.name,
+  }));
+}
 
 export async function listBrands(search?: string): Promise<Brand[]> {
   let query = supabase.from("brands").select("*").order("name", { ascending: true });

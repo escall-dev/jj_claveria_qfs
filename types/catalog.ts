@@ -65,3 +65,30 @@ export interface UpdateProductInput {
   brand_id?: string | null;
   default_uom_id?: string | null;
 }
+
+/**
+ * Lightweight lookup result types for autocomplete and select components.
+ * Strictly read-only projections matching Phase 8 requirements.
+ */
+
+export interface BrandLookupResult {
+  id: string;
+  name: string;
+}
+
+export interface UomLookupResult {
+  id: string;
+  name: string;
+  abbreviation: string | null;
+  active: boolean;
+}
+
+export interface ProductLookupResult {
+  id: string;
+  name: string;
+  description: string | null;
+  brand_id: string | null;
+  default_uom_id: string | null;
+  brand: BrandLookupResult | null;
+  default_uom: UomLookupResult | null;
+}
