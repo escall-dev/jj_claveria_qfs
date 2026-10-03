@@ -1,10 +1,35 @@
-export default function NewQuotationPage() {
+import { redirect } from "next/navigation";
+import { getSession } from "@/lib/auth";
+import { listActiveUoms } from "@/lib/catalog/uoms";
+import { QuotationForm } from "@/components/quotations";
+
+export const metadata = {
+  title: "New Quotation — JJ Claveria QFS",
+  description: "Compose quotation form with customer details, dynamic line items, and catalog autocomplete.",
+};
+
+export default async function NewQuotationPage() {
+  const session = await getSession();
+
+  // Route protection: redirect to login if unauthenticated
+  if (!session) {
+    redirect("/login");
+  }
+
+  // Pre-fetch active Units of Measure (read-only query)
+  const activeUoms = await listActiveUoms();
+
   return (
-    <div className="p-8">
-      <h1 className="text-2xl font-bold">New Quotation</h1>
-      <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
-        Quotation creation form (placeholder).
-      </p>
-    </div>
+    <main className="min-h-screen lg:h-screen lg:max-h-screen lg:overflow-hidden bg-zinc-50 dark:bg-zinc-950 p-2 sm:p-2.5 md:p-3 flex flex-col">
+      <div className="w-full max-w-[1600px] mx-auto flex-1 flex flex-col min-h-0">
+        <QuotationForm
+          initialUoms={activeUoms}
+          currentUser={{
+            displayName: session.displayName,
+            username: session.username,
+          }}
+        />
+      </div>
+    </main>
   );
 }

@@ -27,6 +27,8 @@ export interface ProductAutocompleteProps {
   name?: string;
   /** Additional CSS class names for the outer container */
   className?: string;
+  /** Optional custom CSS classes for the input element */
+  inputClassName?: string;
   /** Max results limit for lookup */
   limit?: number;
 }
@@ -43,6 +45,7 @@ export function ProductAutocomplete({
   id = "product-autocomplete",
   name = "item_description",
   className = "",
+  inputClassName = "",
   limit = 10,
 }: ProductAutocompleteProps) {
   const [isOpen, setIsOpen] = useState(false);
@@ -207,7 +210,9 @@ export function ProductAutocomplete({
           aria-autocomplete="list"
           aria-expanded={isOpen}
           aria-controls={`${id}-suggestions`}
-          className="w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-900 dark:focus:ring-zinc-100 disabled:opacity-50 pr-8"
+          className={`w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 ${
+            inputClassName || "px-3 py-2 text-sm"
+          } text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-900 dark:focus:ring-zinc-100 disabled:opacity-50 pr-8`}
         />
 
         {/* Status indicator: spinner or catalog badge */}

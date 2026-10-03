@@ -23,6 +23,8 @@ export interface UomSelectProps {
   name?: string;
   /** Additional CSS class names */
   className?: string;
+  /** Optional custom CSS classes for the select element */
+  selectClassName?: string;
 }
 
 export function UomSelect({
@@ -35,25 +37,25 @@ export function UomSelect({
   id = "uom-select",
   name = "uom",
   className = "",
+  selectClassName = "",
 }: UomSelectProps) {
-  const [uoms, setUoms] = useState<UomLookupResult[]>(availableUoms || []);
+  const [fetchedUoms, setFetchedUoms] = useState<UomLookupResult[]>([]);
   const [isLoading, setIsLoading] = useState(!availableUoms || availableUoms.length === 0);
+
+  const uoms = availableUoms && availableUoms.length > 0 ? availableUoms : fetchedUoms;
 
   // If availableUoms was not passed, load active UOMs from server action
   useEffect(() => {
     if (availableUoms && availableUoms.length > 0) {
-      setUoms(availableUoms);
-      setIsLoading(false);
       return;
     }
 
     let isMounted = true;
-    setIsLoading(true);
 
     getActiveUomsAction()
       .then((res) => {
         if (isMounted && res.success) {
-          setUoms(res.data);
+          setFetchedUoms(res.data);
         }
       })
       .catch((err) => {
@@ -91,7 +93,9 @@ export function UomSelect({
         onChange={handleChange}
         disabled={disabled || isLoading}
         required={required}
-        className="w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-zinc-900 dark:focus:ring-zinc-100 disabled:opacity-50 appearance-none pr-8 cursor-pointer"
+        className={`w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 ${
+          selectClassName || "px-3 py-2 text-sm"
+        } text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-zinc-900 dark:focus:ring-zinc-100 disabled:opacity-50 appearance-none pr-8 cursor-pointer`}
       >
         <option value="" disabled={required}>
           {isLoading ? "Loading units of measure..." : placeholder}
