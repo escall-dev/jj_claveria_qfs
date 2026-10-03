@@ -1,11 +1,13 @@
 /**
  * Catalog Module Boundary for JJ Claveria QFS.
  *
- * Responsible for:
- * - Brand management
- * - Product repository and item code resolution
- * - Units of Measure (UOM) definitions
- * - Autocomplete data access contracts
+ * Exports domain operations and types for:
+ * - Brands
+ * - Products
+ * - Units of Measure (UOMs)
  */
 
 export * from "@/types/catalog";
+export * from "./brands";
+export * from "./uoms";
+export * from "./products";

@@ -16,3 +16,5 @@ export interface ValidationResult<T> {
 export interface Validator<TInput, TOutput = TInput> {
   validate(input: TInput): ValidationResult<TOutput>;
 }
+
+export * from "./catalog";
