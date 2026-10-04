@@ -76,7 +76,7 @@ export async function computeFileSha256(filePath: string): Promise<string> {
   if (!fs.existsSync(resolved)) {
     throw new TemplateNotFoundError("Cannot hash non-existent file", resolved);
   }
-  const content = await fs.promises.readFile(resolved);
+  const content = await fs.promises.readFile(/*turbopackIgnore: true*/ resolved);
   return computeSha256(content);
 }
 
@@ -105,7 +105,7 @@ export async function verifyTemplateIntegrity(customPath?: string): Promise<{
  */
 export function assertNotCanonicalTemplate(targetPath: string): void {
   try {
-    const canonical = path.resolve(getCanonicalTemplatePath()).toLowerCase();
+    const canonical = path.resolve(/*turbopackIgnore: true*/ getCanonicalTemplatePath()).toLowerCase();
     const target = path.resolve(targetPath).toLowerCase();
     if (canonical === target) {
       throw new TemplateImmutabilityError(
@@ -129,7 +129,7 @@ export async function loadTemplateBuffer(options?: {
   templatePath?: string;
 }): Promise<Buffer> {
   const filePath = getCanonicalTemplatePath(options?.templatePath);
-  const buffer = await fs.promises.readFile(filePath);
+  const buffer = await fs.promises.readFile(/*turbopackIgnore: true*/ filePath);
 
   if (options?.verifyIntegrity !== false) {
     const actualHash = computeSha256(buffer);
@@ -152,7 +152,7 @@ export async function getTemplateMetadata(
   customPath?: string
 ): Promise<TemplateMetadata> {
   const filePath = getCanonicalTemplatePath(customPath);
-  const stats = await fs.promises.stat(filePath);
+  const stats = await fs.promises.stat(/*turbopackIgnore: true*/ filePath);
   const sha256 = await computeFileSha256(filePath);
 
   return {

@@ -70,6 +70,14 @@ export {
   generateItemRows,
 } from "./targets.ts";
 
+// Re-export DOCX export functions
+export {
+  generateQuotationDocx,
+  getQuotationDocxFilename,
+  processQuotationExport,
+} from "./exporter.ts";
+export type { QuotationExportResult } from "./exporter.ts";
+
 // Re-export document types
 export type {
   TemplateMetadata,
