@@ -13,16 +13,11 @@ import { saveQuotationAction } from "@/app/quotations/actions";
 import { QuotationItemRow } from "./quotation-item-row";
 
 /**
- * Creates a new empty quotation line item with a stable unique ID.
+ * Creates a new empty quotation line item with a deterministic or specified ID.
  */
-function createEmptyRow(): QuotationItemFormState {
-  const stableId =
-    typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
-      ? crypto.randomUUID()
-      : `item-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
-
+function createEmptyRow(id: string = "item-1"): QuotationItemFormState {
   return {
-    id: stableId,
+    id,
     productId: null,
     description: "",
     brandId: null,
@@ -45,16 +40,19 @@ export interface QuotationFormProps {
 }
 
 export function QuotationForm({ initialUoms, currentUser }: QuotationFormProps) {
-  // Initial quotation state starting with 1 empty item row
-  const [formData, setFormData] = useState<QuotationFormState>({
+  // Counter to guarantee unique stable IDs for dynamically added rows on the client
+  const rowCounterRef = React.useRef(1);
+
+  // Initial quotation state starting with 1 deterministic empty item row
+  const [formData, setFormData] = useState<QuotationFormState>(() => ({
     date: new Date().toISOString().split("T")[0],
     qfNumber: "",
     companyName: "",
     companyAddress: "",
     contactPerson: "",
     contactNumber: "",
-    items: [createEmptyRow()],
-  });
+    items: [createEmptyRow("item-1")],
+  }));
 
   const [validationResult, setValidationResult] =
     useState<QuotationFormValidationResult | null>(null);
@@ -91,7 +89,8 @@ export function QuotationForm({ initialUoms, currentUser }: QuotationFormProps) 
 
   // Add Item row handler
   const handleAddItem = () => {
-    const newRow = createEmptyRow();
+    rowCounterRef.current += 1;
+    const newRow = createEmptyRow(`item-${rowCounterRef.current}`);
     setFormData((prev) => ({
       ...prev,
       items: [...prev.items, newRow],
@@ -106,9 +105,10 @@ export function QuotationForm({ initialUoms, currentUser }: QuotationFormProps) 
   const handleRemoveItem = (id: string) => {
     setFormData((prev) => {
       if (prev.items.length <= 1) {
+        rowCounterRef.current += 1;
         return {
           ...prev,
-          items: [createEmptyRow()],
+          items: [createEmptyRow(`item-${rowCounterRef.current}`)],
         };
       }
       return {
@@ -214,6 +214,7 @@ export function QuotationForm({ initialUoms, currentUser }: QuotationFormProps) 
   };
 
   const handleCreateAnother = () => {
+    rowCounterRef.current += 1;
     setFormData({
       date: new Date().toISOString().split("T")[0],
       qfNumber: "",
@@ -221,7 +222,7 @@ export function QuotationForm({ initialUoms, currentUser }: QuotationFormProps) 
       companyAddress: "",
       contactPerson: "",
       contactNumber: "",
-      items: [createEmptyRow()],
+      items: [createEmptyRow(`item-${rowCounterRef.current}`)],
     });
     setValidationResult(null);
     setValidatedNotice(null);
