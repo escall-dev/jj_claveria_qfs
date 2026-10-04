@@ -7,10 +7,12 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "node --no-warnings --experimental-strip-types --test tests/calculations.test.mts tests/quotations.test.mts"
+    "test": "node --no-warnings --experimental-strip-types --test tests/calculations.test.mts tests/quotations.test.mts tests/documents.test.mts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.117.2",
+    "@xmldom/xmldom": "^0.9.12",
+    "jszip": "^3.10.2",
     "next": "16.3.8",
     "react": "19.2.8",
     "react-dom": "19.2.8"

@@ -45,3 +45,40 @@ export class DocumentGenerationError extends AppError {
     this.format = format;
   }
 }
+
+export class TemplateNotFoundError extends AppError {
+  public readonly path?: string;
+
+  constructor(message = "Quotation DOCX template file not found", path?: string) {
+    super(path ? `${message}: ${path}` : message, "TEMPLATE_NOT_FOUND", 404);
+    this.name = "TemplateNotFoundError";
+    this.path = path;
+  }
+}
+
+export class TemplateIntegrityError extends AppError {
+  public readonly actualHash: string;
+  public readonly expectedHash: string;
+
+  constructor(message: string, actualHash: string, expectedHash: string) {
+    super(message, "TEMPLATE_INTEGRITY_MISMATCH", 500);
+    this.name = "TemplateIntegrityError";
+    this.actualHash = actualHash;
+    this.expectedHash = expectedHash;
+  }
+}
+
+export class TemplateImmutabilityError extends AppError {
+  constructor(message = "Refusing to overwrite canonical quotation template") {
+    super(message, "TEMPLATE_IMMUTABILITY_VIOLATION", 403);
+    this.name = "TemplateImmutabilityError";
+  }
+}
+
+export class DocumentStructureError extends AppError {
+  constructor(message: string) {
+    super(message, "DOCUMENT_STRUCTURE_INVALID", 500);
+    this.name = "DocumentStructureError";
+  }
+}
+
