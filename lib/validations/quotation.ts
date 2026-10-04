@@ -19,6 +19,7 @@ export interface QuotationFormValidationResult {
   fieldErrors?: {
     date?: string[];
     qfNumber?: string[];
+    customerId?: string[];
     companyName?: string[];
     companyAddress?: string[];
     contactPerson?: string[];

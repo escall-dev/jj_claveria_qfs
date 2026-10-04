@@ -1,4 +1,4 @@
-export type QuotationStatus = "draft" | "pending" | "approved" | "rejected";
+export type QuotationStatus = "draft" | "pending" | "approved" | "rejected" | "finalized" | "cancelled";
 
 export interface QuotationItem {
   id?: string;
@@ -17,6 +17,9 @@ export interface Quotation {
   quotationNumber: string;
   customerId?: string;
   customerName: string;
+  customerAddress?: string;
+  contactPerson?: string;
+  contactNumber?: string;
   date: string;
   status: QuotationStatus;
   items: QuotationItem[];
@@ -28,6 +31,68 @@ export interface Quotation {
   notes?: string;
   createdAt?: string;
   updatedAt?: string;
+}
+
+/**
+ * Database schema model for a quotation record in Supabase (Phase 11).
+ * Features historical customer snapshots.
+ */
+export interface DatabaseQuotation {
+  id: string;
+  qf_number: string;
+  quotation_date: string;
+  customer_id: string | null;
+  customer_name: string;
+  customer_address: string;
+  contact_person: string | null;
+  contact_number: string | null;
+  total_amount: number;
+  status: string;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * Database schema model for an individual quotation line item in Supabase (Phase 11).
+ * Features immutable historical line item snapshots.
+ */
+export interface DatabaseQuotationItem {
+  id: string;
+  quotation_id: string;
+  product_id: string | null;
+  item_number: number;
+  item_description: string;
+  brand_name: string | null;
+  uom: string;
+  unit_price: number;
+  quantity: number;
+  item_total: number;
+  created_at: string;
+}
+
+/**
+ * Fully hydrated quotation containing header and historical item snapshots.
+ */
+export interface QuotationWithItems extends DatabaseQuotation {
+  items: DatabaseQuotationItem[];
+}
+
+/**
+ * Summary representation for Quotation History listing (/quotations).
+ */
+export interface QuotationSummary {
+  id: string;
+  qf_number: string;
+  quotation_date: string;
+  customer_name: string;
+  customer_address: string;
+  contact_person: string | null;
+  contact_number: string | null;
+  total_amount: number;
+  status: string;
+  created_by: string;
+  created_at: string;
 }
 
 /**
@@ -56,14 +121,32 @@ export interface QuotationItemFormState {
 }
 
 /**
- * Quotation form header and body state for Phase 9 New Quotation Form.
+ * Quotation form header and body state for Phase 9 & Phase 11 New Quotation Form.
  */
 export interface QuotationFormState {
   date: string;
   qfNumber: string;
+  customerId?: string | null;
   companyName: string;
   companyAddress: string;
   contactPerson: string;
   contactNumber: string;
   items: QuotationItemFormState[];
+}
+
+/**
+ * Server Action result for quotation persistence operations.
+ */
+export interface SaveQuotationActionResult {
+  success: boolean;
+  quotationId?: string;
+  qfNumber?: string;
+  error?: string;
+  fieldErrors?: Record<string, string[]>;
+  itemErrors?: Record<string, {
+    description?: string[];
+    uom?: string[];
+    unitPrice?: string[];
+    quantity?: string[];
+  }>;
 }

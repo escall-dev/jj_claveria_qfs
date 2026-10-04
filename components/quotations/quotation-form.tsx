@@ -9,6 +9,7 @@ import {
   type QuotationFormValidationResult,
 } from "@/lib/validations/quotation";
 import { calculateQuotationTotal, formatCurrency } from "@/lib/calculations";
+import { saveQuotationAction } from "@/app/quotations/actions";
 import { QuotationItemRow } from "./quotation-item-row";
 
 /**
@@ -58,6 +59,11 @@ export function QuotationForm({ initialUoms, currentUser }: QuotationFormProps) 
   const [validationResult, setValidationResult] =
     useState<QuotationFormValidationResult | null>(null);
   const [validatedNotice, setValidatedNotice] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [savedResult, setSavedResult] = useState<{
+    quotationId: string;
+    qfNumber: string;
+  } | null>(null);
 
   // Field change handlers for header/company details
   const handleFieldChange = (
@@ -159,9 +165,11 @@ export function QuotationForm({ initialUoms, currentUser }: QuotationFormProps) 
     }
   };
 
-  // Save / Validate Attempt
-  const handleFormSubmit = (e: React.FormEvent) => {
+  // Save / Validate Attempt with Phase 11 Server Persistence
+  const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (isSaving) return;
 
     const result = validateQuotationForm(formData);
     setValidationResult(result);
@@ -171,10 +179,53 @@ export function QuotationForm({ initialUoms, currentUser }: QuotationFormProps) 
       return;
     }
 
-    // Phase 9 Boundary: Form validation passed!
-    setValidatedNotice(
-      "Quotation form validated! Data entry and line items are verified. Database persistence (INSERT) is scheduled for Phase 11."
-    );
+    setIsSaving(true);
+    setValidatedNotice(null);
+
+    try {
+      const saveResult = await saveQuotationAction(formData);
+
+      if (!saveResult.success) {
+        setValidationResult({
+          success: false,
+          error: saveResult.error || "Failed to save quotation. Please try again.",
+          fieldErrors: saveResult.fieldErrors,
+          itemErrors: saveResult.itemErrors,
+        });
+        setIsSaving(false);
+        return;
+      }
+
+      setSavedResult({
+        quotationId: saveResult.quotationId || "",
+        qfNumber: saveResult.qfNumber || formData.qfNumber,
+      });
+      setValidatedNotice(
+        `Quotation "${saveResult.qfNumber || formData.qfNumber}" saved successfully!`
+      );
+    } catch {
+      setValidationResult({
+        success: false,
+        error: "An unexpected error occurred while saving the quotation.",
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleCreateAnother = () => {
+    setFormData({
+      date: new Date().toISOString().split("T")[0],
+      qfNumber: "",
+      companyName: "",
+      companyAddress: "",
+      contactPerson: "",
+      contactNumber: "",
+      items: [createEmptyRow()],
+    });
+    setValidationResult(null);
+    setValidatedNotice(null);
+    setSavedResult(null);
   };
 
   // Authoritative Phase 10 quotation calculation engine
@@ -218,7 +269,51 @@ export function QuotationForm({ initialUoms, currentUser }: QuotationFormProps) 
         </div>
       )}
 
-      {validatedNotice && (
+      {savedResult && (
+        <div className="rounded-lg border border-emerald-300 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/70 p-3 text-emerald-900 dark:text-emerald-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 flex-shrink-0 shadow-xs">
+          <div className="flex items-center gap-2.5">
+            <div className="h-8 w-8 rounded-full bg-emerald-100 dark:bg-emerald-900/80 flex items-center justify-center flex-shrink-0">
+              <svg className="h-4 w-4 text-emerald-600 dark:text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7" />
+              </svg>
+            </div>
+            <div>
+              <h3 className="text-xs font-bold sm:text-sm">
+                Quotation {savedResult.qfNumber} Saved Successfully!
+              </h3>
+              <p className="text-[11px] text-emerald-700 dark:text-emerald-300">
+                Customer snapshots and line items have been safely persisted to the database.
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            <Link
+              href={`/quotations/${savedResult.quotationId}`}
+              className="inline-flex items-center gap-1 rounded bg-emerald-600 hover:bg-emerald-700 text-white px-2.5 py-1 text-xs font-semibold shadow-xs transition-colors"
+            >
+              <span>View Quotation</span>
+              <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
+              </svg>
+            </Link>
+            <Link
+              href="/quotations"
+              className="rounded border border-emerald-300 dark:border-emerald-800 bg-white dark:bg-zinc-900 px-2.5 py-1 text-xs font-medium text-emerald-800 dark:text-emerald-200 hover:bg-emerald-100/50 dark:hover:bg-zinc-800 transition-colors"
+            >
+              Quotation History
+            </Link>
+            <button
+              type="button"
+              onClick={handleCreateAnother}
+              className="rounded border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-2.5 py-1 text-xs font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors"
+            >
+              Create Another
+            </button>
+          </div>
+        </div>
+      )}
+
+      {validatedNotice && !savedResult && (
         <div className="rounded-md border border-emerald-200 dark:border-emerald-900 bg-emerald-50 dark:bg-emerald-950/60 px-3 py-1.5 text-xs text-emerald-800 dark:text-emerald-300 flex items-center justify-between gap-2 flex-shrink-0">
           <div className="flex items-center gap-2">
             <svg
@@ -535,12 +630,37 @@ export function QuotationForm({ initialUoms, currentUser }: QuotationFormProps) 
 
           <button
             type="submit"
-            className="inline-flex items-center gap-1.5 rounded bg-zinc-900 dark:bg-zinc-100 px-4 py-1.5 text-xs font-semibold text-white dark:text-zinc-900 hover:bg-zinc-800 dark:hover:bg-zinc-200 transition-colors shadow-xs"
+            disabled={isSaving}
+            className={`inline-flex items-center gap-1.5 rounded bg-zinc-900 dark:bg-zinc-100 px-4 py-1.5 text-xs font-semibold text-white dark:text-zinc-900 hover:bg-zinc-800 dark:hover:bg-zinc-200 transition-colors shadow-xs ${
+              isSaving ? "opacity-70 cursor-not-allowed" : ""
+            }`}
           >
-            <span>Save Quotation</span>
-            <span className="rounded bg-zinc-700 dark:bg-zinc-300 px-1 py-0.2 text-[9px] uppercase font-bold text-zinc-200 dark:text-zinc-800">
-              Phase 11
-            </span>
+            {isSaving ? (
+              <>
+                <svg
+                  className="animate-spin -ml-0.5 h-3.5 w-3.5 text-white dark:text-zinc-900"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                >
+                  <circle
+                    className="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                  />
+                  <path
+                    className="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                  />
+                </svg>
+                <span>Saving Quotation...</span>
+              </>
+            ) : (
+              <span>Save Quotation</span>
+            )}
           </button>
         </div>
       </footer>

@@ -8,3 +8,4 @@
  */
 
 export * from "@/types/quotation";
+export * from "./quotations";
