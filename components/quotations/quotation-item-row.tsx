@@ -7,6 +7,7 @@ import type { QuotationRowError } from "@/lib/validations/quotation";
 import { ProductAutocomplete } from "@/components/catalog/product-autocomplete";
 import { BrandAutocomplete } from "@/components/catalog/brand-autocomplete";
 import { UomSelect } from "@/components/catalog/uom-select";
+import { calculateItemTotal } from "@/lib/calculations";
 
 export interface QuotationItemRowProps {
   /** The item row state */
@@ -76,15 +77,10 @@ export function QuotationItemRow({
     onUpdate(item.id, { brandId: null });
   };
 
-  // Price & Quantity numeric parsing for Phase 9 UI placeholder/preview
-  const priceNum = typeof item.unitPrice === "number" ? item.unitPrice : parseFloat(String(item.unitPrice || ""));
-  const qtyNum = typeof item.quantity === "number" ? item.quantity : parseFloat(String(item.quantity || ""));
-  const hasValidPrice = !isNaN(priceNum) && priceNum >= 0 && item.unitPrice !== "";
-  const hasValidQty = !isNaN(qtyNum) && qtyNum > 0 && item.quantity !== "";
-
-  // Temporary UI preview for Phase 9 (Authoritative calculation domain engine is in Phase 10)
-  const previewTotal = hasValidPrice && hasValidQty
-    ? `₱ ${(priceNum * qtyNum).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+  // Authoritative Phase 10 line item calculation
+  const itemCalculation = calculateItemTotal(item.unitPrice, item.quantity, item.id);
+  const previewTotal = itemCalculation.success
+    ? itemCalculation.formattedCurrency
     : "—";
 
   return (
@@ -214,11 +210,11 @@ export function QuotationItemRow({
         </div>
       </td>
 
-      {/* 7. Item Total (Phase 9 placeholder / preview) */}
+      {/* 7. Item Total (Authoritative Phase 10 calculation engine) */}
       <td className="py-1 px-2 min-w-[100px] text-right font-medium text-xs text-zinc-700 dark:text-zinc-300 align-middle">
         <span
-          title="Phase 9 UI preview. Authoritative calculation engine will be enabled in Phase 10."
-          className="cursor-help"
+          title={itemCalculation.success ? `Item total: ${itemCalculation.formattedCurrency}` : (itemCalculation.error || "Item total")}
+          className={itemCalculation.success ? "tabular-nums" : "cursor-default text-zinc-400"}
         >
           {previewTotal}
         </span>

@@ -8,6 +8,7 @@ import {
   validateQuotationForm,
   type QuotationFormValidationResult,
 } from "@/lib/validations/quotation";
+import { calculateQuotationTotal, formatCurrency } from "@/lib/calculations";
 import { QuotationItemRow } from "./quotation-item-row";
 
 /**
@@ -176,15 +177,11 @@ export function QuotationForm({ initialUoms, currentUser }: QuotationFormProps) 
     );
   };
 
-  // Quick UI estimation for subtotal preview (Phase 9 preview only)
-  const estimatedSubtotal = formData.items.reduce((sum, item) => {
-    const price = typeof item.unitPrice === "number" ? item.unitPrice : parseFloat(String(item.unitPrice || ""));
-    const qty = typeof item.quantity === "number" ? item.quantity : parseFloat(String(item.quantity || ""));
-    if (!isNaN(price) && !isNaN(qty) && price >= 0 && qty > 0) {
-      return sum + price * qty;
-    }
-    return sum;
-  }, 0);
+  // Authoritative Phase 10 quotation calculation engine
+  const quotationCalculation = calculateQuotationTotal(formData.items);
+  const displayedSubtotal = quotationCalculation.success
+    ? quotationCalculation.totalAmount
+    : quotationCalculation.validItemsSubtotal;
 
   const errors = validationResult?.fieldErrors;
 
@@ -531,8 +528,8 @@ export function QuotationForm({ initialUoms, currentUser }: QuotationFormProps) 
             <span className="text-[10px] uppercase font-bold tracking-wider text-zinc-500">
               Subtotal Preview:
             </span>
-            <span className="text-sm font-bold text-zinc-900 dark:text-zinc-100">
-              ₱ {estimatedSubtotal.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            <span className="text-sm font-bold text-zinc-900 dark:text-zinc-100 tabular-nums">
+              {formatCurrency(displayedSubtotal)}
             </span>
           </div>
 
