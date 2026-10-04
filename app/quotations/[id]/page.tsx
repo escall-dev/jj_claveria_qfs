@@ -75,7 +75,7 @@ export default async function QuotationDetailPage({
             </Link>
             <a
               href={`/quotations/${quotation.id}/export`}
-              download
+              download={`${quotation.qf_number}.docx`}
               id="export-docx-button"
               className="inline-flex items-center gap-1.5 rounded-lg border border-blue-600 dark:border-blue-500 bg-blue-50 dark:bg-blue-950/60 px-3.5 py-1.5 text-xs font-semibold text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/60 transition-colors shadow-xs"
             >

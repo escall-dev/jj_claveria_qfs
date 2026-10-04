@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import fs from "node:fs";
 import JSZip from "jszip";
 import {
   generateQuotationDocx,
@@ -10,6 +11,7 @@ import {
   getCanonicalTemplatePath,
   computeFileSha256,
   CANONICAL_TEMPLATE_SHA256,
+  CANONICAL_TEMPLATE_BYTE_SIZE,
 } from "../lib/documents/index.ts";
 import { formatCurrency } from "../lib/calculations/index.ts";
 import type { QuotationWithItems, DatabaseQuotationItem } from "../types/quotation.ts";
@@ -313,18 +315,17 @@ test("10. Fixed-content preservation: retains all legal, terms, secretariat, and
   const xml = await zip.file("word/document.xml")?.async("string");
   assert.ok(xml, "word/document.xml must exist in exported package");
 
-  // Representative fixed template sections
+  // Representative fixed template sections from the canonical template
   assert.ok(xml.includes("Terms and Conditions:"), "Terms and Conditions section must be preserved");
   assert.ok(xml.includes("Privacy Statements:"), "Privacy Statements section must be preserved");
   assert.ok(xml.includes("Modes of Payment:"), "Modes of Payment section must be preserved");
-  assert.ok(xml.includes("Secretariat Name"), "Secretariat Name placeholder must be preserved");
   assert.ok(xml.includes("Secretariat"), "Secretariat title must be preserved");
-  assert.ok(xml.includes("COMPANY DETAILS"), "COMPANY DETAILS heading must be preserved");
   assert.ok(xml.includes("QUOTATION DETAILS"), "QUOTATION DETAILS heading must be preserved");
-  assert.ok(xml.includes("FORMAL QUOTATION"), "FORMAL QUOTATION title must be preserved");
+  assert.ok(xml.includes("JJ CLAVERIA PAINT"), "JJ CLAVERIA PAINT heading must be preserved");
+  assert.ok(xml.includes("ehms.jjclaveria@gmail.com"), "Secretariat email must be preserved");
 });
 
-test("11. Canonical template integrity: disk template SHA-256 remains 86020610DC7773AB65FA4BD944EE467FB6A789294701BE43B19DCF23493F4CA8", async () => {
+test("11. Canonical template integrity: disk template SHA-256 remains strictly unchanged after all operations", async () => {
   const canonicalPath = getCanonicalTemplatePath();
   const currentHash = await computeFileSha256(canonicalPath);
   assert.strictEqual(
@@ -345,7 +346,7 @@ test("12. DOCX reload test: generated buffer is a valid ZIP and reloads cleanly 
 
   // 2. Reload as WorkingDocument
   const doc = await WorkingDocument.load(buffer, { verifyIntegrity: false });
-  assert.strictEqual(doc.getTables().length, 4);
+  assert.strictEqual(doc.getTables().length, 3);
   assert.strictEqual(doc.isTotalRowLast(), true);
   assert.doesNotThrow(() => doc.validateDocumentStructure());
 });
@@ -426,4 +427,104 @@ test("16. Safe filename helper: sanitizes QF numbers and prevents path traversal
   assert.strictEqual(getQuotationDocxFilename("QF#2026/001:Special*"), "QF-2026-001-Special.docx");
   assert.strictEqual(getQuotationDocxFilename(null), "quotation.docx");
   assert.strictEqual(getQuotationDocxFilename(""), "quotation.docx");
+});
+
+test("17. Binary DOCX output verification: ZIP magic bytes (PK\\x03\\x04) and OpenXML parts", async () => {
+  const quotation = createSavedQuotationFixture(2);
+  const buffer = await generateQuotationDocx(quotation);
+
+  assert.ok(Buffer.isBuffer(buffer), "Generated output must be a Buffer");
+  assert.ok(buffer.length > 0, "Generated buffer must have length > 0");
+
+  // Verify ZIP magic header: 0x50 0x4B 0x03 0x04 ('PK\x03\x04')
+  assert.strictEqual(buffer[0], 0x50, "Byte 0 must be 0x50 ('P')");
+  assert.strictEqual(buffer[1], 0x4b, "Byte 1 must be 0x4B ('K')");
+  assert.strictEqual(buffer[2], 0x03, "Byte 2 must be 0x03");
+  assert.strictEqual(buffer[3], 0x04, "Byte 3 must be 0x04");
+
+  // Parse as valid ZIP
+  const zip = await JSZip.loadAsync(buffer);
+  assert.ok(zip.file("[Content_Types].xml"), "Must contain [Content_Types].xml");
+  assert.ok(zip.file("word/document.xml"), "Must contain word/document.xml");
+  assert.ok(zip.file("word/styles.xml"), "Must contain word/styles.xml");
+
+  // Verify XML parses cleanly
+  const xmlContent = await zip.file("word/document.xml")?.async("string");
+  assert.ok(xmlContent && xmlContent.length > 0);
+  assert.ok(xmlContent.includes("<w:document"));
+  assert.ok(xmlContent.includes("</w:document>"));
+});
+
+test("18. Distinctive current-template content preservation: proves new official template is strictly used", async () => {
+  const quotation = createSavedQuotationFixture(1);
+  const buffer = await generateQuotationDocx(quotation);
+
+  const zip = await JSZip.loadAsync(buffer);
+  const xml = await zip.file("word/document.xml")?.async("string");
+  assert.ok(xml, "word/document.xml must exist");
+
+  // Distinctive content that exists ONLY in the updated canonical template
+  assert.ok(
+    xml.includes("JJ CLAVERIA PAINT &amp; INDUSTRIAL") || xml.includes("JJ CLAVERIA PAINT"),
+    "Must preserve the store header from current template"
+  );
+  assert.ok(xml.includes("Muntinlupa City"), "Must preserve store address from current template");
+  assert.ok(xml.includes("ehms.jjclaveria@gmail.com"), "Must preserve email from current template");
+  assert.ok(xml.includes("Escallen"), "Must preserve distinctive secretariat from current template");
+});
+
+test("19. Route response regression guard: strictly binary DOCX, no text/plain, no json, no string serialization", async () => {
+  const dummySession = {
+    userId: "usr_dev_admin_001",
+    username: "admin",
+    displayName: "Admin User",
+    expiresAt: Date.now() + 3600000,
+  };
+  const quotation = createSavedQuotationFixture(3, { qf_number: "JJ-CLAVERIA-QF-2026-001" });
+  const result = await processQuotationExport(dummySession, quotation, quotation.id);
+
+  assert.strictEqual(result.status, 200);
+
+  // Content-Type must strictly be DOCX MIME type
+  assert.strictEqual(
+    result.headers["Content-Type"],
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+  );
+  assert.notStrictEqual(result.headers["Content-Type"], "text/plain");
+  assert.notStrictEqual(result.headers["Content-Type"], "application/json");
+  assert.notStrictEqual(result.headers["Content-Type"], "text/html");
+
+  // Content-Disposition must attach a .docx file (including RFC 5987 encoding)
+  assert.ok(result.headers["Content-Disposition"].startsWith("attachment;"));
+  assert.ok(result.headers["Content-Disposition"].includes('filename="JJ-CLAVERIA-QF-2026-001.docx"'));
+  assert.ok(result.headers["Content-Disposition"].endsWith(".docx") || result.headers["Content-Disposition"].endsWith('.docx"'));
+
+  // Body must strictly be a binary Uint8Array, NOT a string
+  assert.strictEqual(typeof result.body, "object");
+  assert.ok(result.body instanceof Uint8Array);
+  assert.strictEqual(typeof result.body === "string", false, "Body must NOT be a string");
+
+  // Magic bytes of response body
+  const bytes = result.body as Uint8Array;
+  assert.strictEqual(bytes[0], 0x50);
+  assert.strictEqual(bytes[1], 0x4b);
+  assert.strictEqual(bytes[2], 0x03);
+  assert.strictEqual(bytes[3], 0x04);
+});
+
+test("20. Current canonical template file on disk: strictly valid DOCX and immutable", async () => {
+  const templatePath = getCanonicalTemplatePath();
+  const fileBytes = await fs.promises.readFile(templatePath);
+
+  assert.strictEqual(fileBytes.length, CANONICAL_TEMPLATE_BYTE_SIZE);
+
+  // Check SHA-256
+  const currentHash = await computeFileSha256(templatePath);
+  assert.strictEqual(currentHash, CANONICAL_TEMPLATE_SHA256);
+
+  // Check ZIP structure of template file
+  const zip = await JSZip.loadAsync(fileBytes);
+  assert.ok(zip.file("[Content_Types].xml"), "Template must contain [Content_Types].xml");
+  assert.ok(zip.file("word/document.xml"), "Template must contain word/document.xml");
+  assert.ok(zip.file("word/styles.xml"), "Template must contain word/styles.xml");
 });

@@ -17,9 +17,9 @@ export const CANONICAL_TEMPLATE_RELATIVE_PATH = path.join(
 );
 
 export const CANONICAL_TEMPLATE_SHA256 =
-  "86020610DC7773AB65FA4BD944EE467FB6A789294701BE43B19DCF23493F4CA8";
+  "2CD3D697C193CAECADF107D41255BD9D4378DE35C3F59DF6D3085799EC3A9B02";
 
-export const CANONICAL_TEMPLATE_BYTE_SIZE = 37926;
+export const CANONICAL_TEMPLATE_BYTE_SIZE = 37524;
 
 /**
  * Resolves the canonical template file path safely relative to the project root.
@@ -159,8 +159,8 @@ export async function getTemplateMetadata(
     filePath,
     sha256,
     byteSize: stats.size,
-    tableCount: 4,
-    bodyParagraphCount: 10,
+    tableCount: 3,
+    bodyParagraphCount: 13,
     preallocatedItemRowCount: 6,
   };
 }

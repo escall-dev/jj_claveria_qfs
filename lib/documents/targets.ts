@@ -70,7 +70,7 @@ export function extractTable1Targets(table: Element): Table1HeaderTarget {
   }
 
   const companyInfoCell = cells[0];
-  const metaInfoCell = cells[1];
+  const metaInfoCell = cells.length > 1 ? cells[1] : cells[0];
 
   let dateTextNode: Node | null = null;
   let qfNumberTextNode: Node | null = null;
@@ -80,8 +80,26 @@ export function extractTable1Targets(table: Element): Table1HeaderTarget {
     const text = tNodes[i].textContent || "";
     if (text.includes("Date:")) {
       dateTextNode = tNodes[i];
-    } else if (text.includes("QF #:") || text.includes("QF:")) {
+    } else if (text.includes("QF #:") || text.includes("QF:") || text.includes("QF#")) {
       qfNumberTextNode = tNodes[i];
+    }
+  }
+
+  // If Date or QF# are not in the table cell (e.g. in standalone body paragraphs in updated template),
+  // search the document body text nodes
+  if (!dateTextNode || !qfNumberTextNode) {
+    const doc = table.ownerDocument;
+    if (doc) {
+      const allT = doc.getElementsByTagName("w:t");
+      for (let i = 0; i < allT.length; i++) {
+        const text = allT[i].textContent || "";
+        if (!dateTextNode && text.includes("Date:")) {
+          dateTextNode = allT[i];
+        }
+        if (!qfNumberTextNode && (text.includes("QF #:") || text.includes("QF:") || text.includes("QF#"))) {
+          qfNumberTextNode = allT[i];
+        }
+      }
     }
   }
 
@@ -141,12 +159,13 @@ export function extractTable3Targets(table: Element): Table3QuotationItemTargets
     );
   }
 
-  // Preallocated item rows are rows 1 to 6 (if present)
+  // Preallocated item rows are rows with >= 7 cells (excluding header and total row if present)
   const itemRows: Table3ItemRowTarget[] = [];
   for (let r = 1; r < rows.length; r++) {
     const rowEl = rows[r];
     const cells = getChildElements(rowEl, "w:tc");
-    if (cells.length >= 7) {
+    const rowText = getCellText(cells[0] || rowEl);
+    if (cells.length >= 7 && !rowText.includes("Total Amount:")) {
       itemRows.push({
         rowIndex: r,
         rowElement: rowEl,
@@ -182,32 +201,63 @@ export function extractTable3Targets(table: Element): Table3QuotationItemTargets
 
 /**
  * Extracts Table 4 targets: Grand total insertion area.
+ * Supports both standalone Table 4 or Table 3 merged total row layouts.
  */
-export function extractTable4Targets(table: Element): Table4GrandTotalTarget {
-  const rows = getChildElements(table, "w:tr");
-  if (rows.length < 1) {
-    throw new DocumentStructureError("Table 4 (Total) must contain at least 1 row");
+export function extractTable4Targets(
+  tableOrDom: Element | Document,
+  fallbackTable3?: Element
+): Table4GrandTotalTarget {
+  let table: Element | null = null;
+  let totalRow: Element | null = null;
+
+  if (tableOrDom.nodeName === "w:tbl") {
+    table = tableOrDom as Element;
+    const rows = getChildElements(table, "w:tr");
+    for (const r of rows) {
+      if (getCellText(r).includes("Total Amount:")) {
+        totalRow = r;
+        break;
+      }
+    }
   }
 
-  const row = rows[0];
-  const cells = getChildElements(row, "w:tc");
-  if (cells.length < 3) {
+  if (!totalRow && fallbackTable3) {
+    table = fallbackTable3;
+    const t3Rows = getChildElements(fallbackTable3, "w:tr");
+    for (const r of t3Rows) {
+      if (getCellText(r).includes("Total Amount:")) {
+        totalRow = r;
+        break;
+      }
+    }
+  }
+
+  if (!table || !totalRow) {
+    throw new DocumentStructureError("Total Amount row could not be found in document");
+  }
+
+  const cells = getChildElements(totalRow, "w:tc");
+  if (cells.length < 2) {
     throw new DocumentStructureError(
-      `Table 4 (Total) row must contain 3 cells (Label, Quantity Spacer, Grand Total), found ${cells.length}`
+      `Total row must contain at least 2 cells, found ${cells.length}`
     );
   }
 
+  const labelCell = cells[0];
+  const grandTotalCell = cells[cells.length - 1];
+  const quantitySpacerCell = cells.length >= 3 ? cells[1] : cells[0];
+
   return {
     tableElement: table,
-    rowElement: row,
-    labelCell: cells[0],
-    quantitySpacerCell: cells[1],
-    grandTotalCell: cells[2],
+    rowElement: totalRow,
+    labelCell,
+    quantitySpacerCell,
+    grandTotalCell,
   };
 }
 
 /**
- * Maps all structural targets from the 4 canonical tables of the official template.
+ * Maps all structural targets from the canonical tables of the official template.
  */
 export function extractDocumentTargets(dom: Document): DocumentTargetMap {
   const body = dom.getElementsByTagName("w:body")[0];
@@ -216,22 +266,30 @@ export function extractDocumentTargets(dom: Document): DocumentTargetMap {
   }
 
   const tables = getChildElements(body, "w:tbl");
-  if (tables.length < 4) {
+  if (tables.length < 3) {
     throw new DocumentStructureError(
-      `Canonical template requires 4 tables, found ${tables.length}`
+      `Canonical template requires at least 3 tables, found ${tables.length}`
     );
   }
 
+  const table1 = extractTable1Targets(tables[0]);
+  const table2 = extractTable2Targets(tables[1]);
+  const table3 = extractTable3Targets(tables[2]);
+  const table4 =
+    tables.length >= 4
+      ? extractTable4Targets(tables[3], tables[2])
+      : extractTable4Targets(tables[2]);
+
   return {
-    table1: extractTable1Targets(tables[0]),
-    table2: extractTable2Targets(tables[1]),
-    table3: extractTable3Targets(tables[2]),
-    table4: extractTable4Targets(tables[3]),
+    table1,
+    table2,
+    table3,
+    table4,
   };
 }
 
 /**
- * Updates the Date and QF Number in Table 1, Row 1, Cell 2.
+ * Updates the Date and QF Number, preserving existing indentation, spaces, and formatting.
  */
 export function setDateAndQfNumber(
   targets: Table1HeaderTarget,
@@ -239,10 +297,23 @@ export function setDateAndQfNumber(
   qfNumber: string
 ): void {
   if (targets.dateTextNode) {
-    targets.dateTextNode.textContent = `Date: ${date}`;
+    const current = targets.dateTextNode.textContent || "";
+    if (current.includes("Date:")) {
+      const prefix = current.slice(0, current.indexOf("Date:") + 5);
+      targets.dateTextNode.textContent = `${prefix} ${date}`;
+    } else {
+      targets.dateTextNode.textContent = `Date: ${date}`;
+    }
   }
   if (targets.qfNumberTextNode) {
-    targets.qfNumberTextNode.textContent = `QF #: ${qfNumber}`;
+    const current = targets.qfNumberTextNode.textContent || "";
+    const match = current.match(/QF\s*#?:?/);
+    if (match && match.index !== undefined) {
+      const prefix = current.slice(0, match.index);
+      targets.qfNumberTextNode.textContent = `${prefix}QF #: ${qfNumber}`;
+    } else {
+      targets.qfNumberTextNode.textContent = `QF #: ${qfNumber}`;
+    }
   }
 }
 
@@ -473,15 +544,13 @@ export function validateQuotationDocumentStructure(dom: Document): void {
   }
 
   const tables = getChildElements(body, "w:tbl");
-  if (tables.length < 4) {
+  if (tables.length < 3) {
     throw new DocumentStructureError(
-      `Canonical template requires 4 tables, found ${tables.length}`
+      `Canonical template requires at least 3 tables, found ${tables.length}`
     );
   }
 
   const table3 = tables[2];
-  const table4 = tables[3];
-
   const t3Rows = getChildElements(table3, "w:tr");
   if (t3Rows.length < 2) {
     throw new DocumentStructureError(
@@ -498,8 +567,51 @@ export function validateQuotationDocumentStructure(dom: Document): void {
     );
   }
 
+  // Check if Total row is last row of Table 3 or in separate Table 4
+  const lastT3Row = t3Rows[t3Rows.length - 1];
+  const isTotalInTable3 = getCellText(lastT3Row).includes("Total Amount:");
+
+  let totalRow: Element | null = null;
+  let itemRows: Element[] = [];
+
+  if (isTotalInTable3) {
+    totalRow = lastT3Row;
+    itemRows = t3Rows.slice(1, -1);
+  } else {
+    if (tables.length < 4) {
+      throw new DocumentStructureError(
+        "Total row not found in Table 3 and Table 4 does not exist"
+      );
+    }
+    const table4 = tables[3];
+    const t4Rows = getChildElements(table4, "w:tr");
+    if (t4Rows.length !== 1) {
+      throw new DocumentStructureError(
+        `Table 4 must contain exactly 1 total row, found ${t4Rows.length}`
+      );
+    }
+    totalRow = t4Rows[0];
+    itemRows = t3Rows.slice(1);
+
+    // Verify Table 4 is positioned immediately after Table 3 in document body
+    let nextEl = table3.nextSibling;
+    while (nextEl && nextEl.nodeType !== 1) {
+      nextEl = nextEl.nextSibling;
+    }
+    if (nextEl !== table4) {
+      throw new DocumentStructureError(
+        "Table 4 (Total row) must immediately follow Table 3 (Items) in document body"
+      );
+    }
+  }
+
+  if (itemRows.length < 1) {
+    throw new DocumentStructureError(
+      `Table 3 must contain at least 1 item row, found ${itemRows.length}`
+    );
+  }
+
   // Item rows validation
-  const itemRows = t3Rows.slice(1);
   for (let r = 0; r < itemRows.length; r++) {
     const row = itemRows[r];
     const cells = getChildElements(row, "w:tc");
@@ -520,36 +632,18 @@ export function validateQuotationDocumentStructure(dom: Document): void {
     }
   }
 
-  // Table 4 (Total row) validation
-  const t4Rows = getChildElements(table4, "w:tr");
-  if (t4Rows.length !== 1) {
+  // Total row validation
+  const totalCells = getChildElements(totalRow, "w:tc");
+  if (totalCells.length < 2) {
     throw new DocumentStructureError(
-      `Table 4 must contain exactly 1 total row, found ${t4Rows.length}`
-    );
-  }
-
-  const totalCells = getChildElements(t4Rows[0], "w:tc");
-  if (totalCells.length < 3) {
-    throw new DocumentStructureError(
-      `Table 4 total row must contain at least 3 cells, found ${totalCells.length}`
+      `Total row must contain at least 2 cells, found ${totalCells.length}`
     );
   }
 
   const totalLabel = getCellText(totalCells[0]);
   if (!totalLabel.includes("Total Amount:")) {
     throw new DocumentStructureError(
-      `Table 4 total row must contain "Total Amount:" label, found "${totalLabel}"`
-    );
-  }
-
-  // Verify Table 4 is positioned immediately after Table 3 in document body
-  let nextEl = table3.nextSibling;
-  while (nextEl && nextEl.nodeType !== 1) {
-    nextEl = nextEl.nextSibling;
-  }
-  if (nextEl !== table4) {
-    throw new DocumentStructureError(
-      "Table 4 (Total row) must immediately follow Table 3 (Items) in document body"
+      `Total row must contain "Total Amount:" label, found "${totalLabel}"`
     );
   }
 }
@@ -558,7 +652,7 @@ export function validateQuotationDocumentStructure(dom: Document): void {
  * Dynamically adjusts Table 3 item rows to match the requested itemCount:
  * - Validates itemCount (positive integer).
  * - Preserves Table 3 Row 0 (Header).
- * - Preserves Table 4 Row 0 (Total row, remaining last).
+ * - Preserves Total Row, remaining last.
  * - Shrinks rows if itemCount < existing.
  * - Expands rows using prototype clone if itemCount > existing.
  * - Idempotent if itemCount === existing.
@@ -577,9 +671,9 @@ export function prepareItemRows(
   }
 
   const tables = getChildElements(body, "w:tbl");
-  if (tables.length < 4) {
+  if (tables.length < 3) {
     throw new DocumentStructureError(
-      `Canonical template requires 4 tables, found ${tables.length}`
+      `Canonical template requires at least 3 tables, found ${tables.length}`
     );
   }
 
@@ -591,12 +685,17 @@ export function prepareItemRows(
     );
   }
 
-  const prototypeElement = prototypeOverride ?? existingRows[1];
-  const currentItemRows = existingRows.slice(1);
+  // Check if Table 3 has total row as last row
+  const lastRow = existingRows[existingRows.length - 1];
+  const hasTotalInTable3 = getCellText(lastRow).includes("Total Amount:");
+  const totalRowInTable3 = hasTotalInTable3 ? lastRow : null;
+
+  const currentItemRows = hasTotalInTable3 ? existingRows.slice(1, -1) : existingRows.slice(1);
   const currentCount = currentItemRows.length;
+  const prototypeElement = prototypeOverride ?? existingRows[1];
 
   if (currentCount > itemCount) {
-    // Remove excess rows from the end
+    // Remove excess rows from the end of item rows
     for (let i = currentCount - 1; i >= itemCount; i--) {
       table3.removeChild(currentItemRows[i]);
     }
@@ -605,7 +704,11 @@ export function prepareItemRows(
     const additionalCount = itemCount - currentCount;
     for (let i = 0; i < additionalCount; i++) {
       const clonedRow = createCleanItemRowClone(prototypeElement);
-      table3.appendChild(clonedRow);
+      if (totalRowInTable3) {
+        table3.insertBefore(clonedRow, totalRowInTable3);
+      } else {
+        table3.appendChild(clonedRow);
+      }
     }
   }
 
