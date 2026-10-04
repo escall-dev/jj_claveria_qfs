@@ -43,6 +43,12 @@ export {
 // Re-export working document abstraction
 export { WorkingDocument } from "./docx.ts";
 
+// Re-export document errors
+export {
+  DocumentStructureError,
+  DocumentItemCountError,
+} from "../errors.ts";
+
 // Re-export structural targets and helpers
 export {
   ITEM_TABLE_COLUMN_WIDTHS_DXA,
@@ -57,6 +63,11 @@ export {
   setCustomerField,
   setGrandTotal,
   populateItemRow,
+  createCleanItemRowClone,
+  validateItemCount,
+  validateQuotationDocumentStructure,
+  prepareItemRows,
+  generateItemRows,
 } from "./targets.ts";
 
 // Re-export document types

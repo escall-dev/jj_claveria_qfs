@@ -1,5 +1,5 @@
 import type { Document, Element, Node } from "@xmldom/xmldom";
-import { DocumentStructureError } from "../errors.ts";
+import { DocumentStructureError, DocumentItemCountError } from "../errors.ts";
 import type {
   DocumentTargetMap,
   Table1HeaderTarget,
@@ -168,7 +168,7 @@ export function extractTable3Targets(table: Element): Table3QuotationItemTargets
     columnWidthsDxa: ITEM_TABLE_COLUMN_WIDTHS_DXA,
     columnCount: 7,
     clone(): Element {
-      return prototypeElement.cloneNode(true) as Element;
+      return createCleanItemRowClone(prototypeElement);
     },
   };
 
@@ -425,3 +425,196 @@ export function populateItemRow(
   setCellFormattedText(rowTarget.quantityCell, item.quantity, "right");
   setCellFormattedText(rowTarget.totalCell, item.total, "right");
 }
+
+/**
+ * Validates that the requested item count is a positive finite integer.
+ */
+export function validateItemCount(itemCount: unknown): asserts itemCount is number {
+  if (
+    typeof itemCount !== "number" ||
+    !Number.isInteger(itemCount) ||
+    itemCount <= 0 ||
+    !Number.isFinite(itemCount)
+  ) {
+    throw new DocumentItemCountError(
+      `Invalid item count: ${String(itemCount)}. Item count must be a positive integer (>= 1).`
+    );
+  }
+}
+
+/**
+ * Deeply clones an item prototype row, ensuring that all formatting, properties,
+ * borders, widths, and run styling are preserved, while cell text is reset to empty string.
+ */
+export function createCleanItemRowClone(prototypeRow: Element): Element {
+  const cloned = prototypeRow.cloneNode(true) as Element;
+  const cells = getChildElements(cloned, "w:tc");
+  for (let i = 0; i < cells.length; i++) {
+    const tNodes = cells[i].getElementsByTagName("w:t");
+    for (let t = 0; t < tNodes.length; t++) {
+      tNodes[t].textContent = "";
+    }
+  }
+  return cloned;
+}
+
+/**
+ * Validates the complete quotation document table structure:
+ * - Table 1 (Header), Table 2 (Customer), Table 3 (Items), and Table 4 (Total) exist.
+ * - Table 3 has a valid 7-column header row.
+ * - Table 3 has at least 1 item row.
+ * - Every item row has exactly 7 cells with expected column widths.
+ * - Table 4 has the Total Amount row and follows Table 3 (total row is last).
+ */
+export function validateQuotationDocumentStructure(dom: Document): void {
+  const body = dom.getElementsByTagName("w:body")[0];
+  if (!body) {
+    throw new DocumentStructureError("Document is missing <w:body> element");
+  }
+
+  const tables = getChildElements(body, "w:tbl");
+  if (tables.length < 4) {
+    throw new DocumentStructureError(
+      `Canonical template requires 4 tables, found ${tables.length}`
+    );
+  }
+
+  const table3 = tables[2];
+  const table4 = tables[3];
+
+  const t3Rows = getChildElements(table3, "w:tr");
+  if (t3Rows.length < 2) {
+    throw new DocumentStructureError(
+      `Table 3 must contain at least 1 header row and 1 item row, found ${t3Rows.length}`
+    );
+  }
+
+  // Header row validation
+  const headerRow = t3Rows[0];
+  const headerCells = getChildElements(headerRow, "w:tc");
+  if (headerCells.length !== 7) {
+    throw new DocumentStructureError(
+      `Table 3 header row must contain 7 columns, found ${headerCells.length}`
+    );
+  }
+
+  // Item rows validation
+  const itemRows = t3Rows.slice(1);
+  for (let r = 0; r < itemRows.length; r++) {
+    const row = itemRows[r];
+    const cells = getChildElements(row, "w:tc");
+    if (cells.length !== 7) {
+      throw new DocumentStructureError(
+        `Item row ${r + 1} must contain exactly 7 cells, found ${cells.length}`
+      );
+    }
+
+    for (let c = 0; c < 7; c++) {
+      const tcW = cells[c].getElementsByTagName("w:tcW")[0];
+      const width = tcW ? Number(tcW.getAttribute("w:w")) : null;
+      if (width !== ITEM_TABLE_COLUMN_WIDTHS_DXA[c]) {
+        throw new DocumentStructureError(
+          `Item row ${r + 1} column ${c + 1} width mismatch: expected ${ITEM_TABLE_COLUMN_WIDTHS_DXA[c]} dxa, found ${width} dxa`
+        );
+      }
+    }
+  }
+
+  // Table 4 (Total row) validation
+  const t4Rows = getChildElements(table4, "w:tr");
+  if (t4Rows.length !== 1) {
+    throw new DocumentStructureError(
+      `Table 4 must contain exactly 1 total row, found ${t4Rows.length}`
+    );
+  }
+
+  const totalCells = getChildElements(t4Rows[0], "w:tc");
+  if (totalCells.length < 3) {
+    throw new DocumentStructureError(
+      `Table 4 total row must contain at least 3 cells, found ${totalCells.length}`
+    );
+  }
+
+  const totalLabel = getCellText(totalCells[0]);
+  if (!totalLabel.includes("Total Amount:")) {
+    throw new DocumentStructureError(
+      `Table 4 total row must contain "Total Amount:" label, found "${totalLabel}"`
+    );
+  }
+
+  // Verify Table 4 is positioned immediately after Table 3 in document body
+  let nextEl = table3.nextSibling;
+  while (nextEl && nextEl.nodeType !== 1) {
+    nextEl = nextEl.nextSibling;
+  }
+  if (nextEl !== table4) {
+    throw new DocumentStructureError(
+      "Table 4 (Total row) must immediately follow Table 3 (Items) in document body"
+    );
+  }
+}
+
+/**
+ * Dynamically adjusts Table 3 item rows to match the requested itemCount:
+ * - Validates itemCount (positive integer).
+ * - Preserves Table 3 Row 0 (Header).
+ * - Preserves Table 4 Row 0 (Total row, remaining last).
+ * - Shrinks rows if itemCount < existing.
+ * - Expands rows using prototype clone if itemCount > existing.
+ * - Idempotent if itemCount === existing.
+ * - Validates document structure and returns strongly-typed row targets in order.
+ */
+export function prepareItemRows(
+  dom: Document,
+  itemCount: number,
+  prototypeOverride?: Element
+): Table3ItemRowTarget[] {
+  validateItemCount(itemCount);
+
+  const body = dom.getElementsByTagName("w:body")[0];
+  if (!body) {
+    throw new DocumentStructureError("Document is missing <w:body> element");
+  }
+
+  const tables = getChildElements(body, "w:tbl");
+  if (tables.length < 4) {
+    throw new DocumentStructureError(
+      `Canonical template requires 4 tables, found ${tables.length}`
+    );
+  }
+
+  const table3 = tables[2];
+  const existingRows = getChildElements(table3, "w:tr");
+  if (existingRows.length < 2) {
+    throw new DocumentStructureError(
+      `Table 3 must contain at least 1 header row and 1 item row, found ${existingRows.length}`
+    );
+  }
+
+  const prototypeElement = prototypeOverride ?? existingRows[1];
+  const currentItemRows = existingRows.slice(1);
+  const currentCount = currentItemRows.length;
+
+  if (currentCount > itemCount) {
+    // Remove excess rows from the end
+    for (let i = currentCount - 1; i >= itemCount; i--) {
+      table3.removeChild(currentItemRows[i]);
+    }
+  } else if (currentCount < itemCount) {
+    // Clone prototype and insert additional rows
+    const additionalCount = itemCount - currentCount;
+    for (let i = 0; i < additionalCount; i++) {
+      const clonedRow = createCleanItemRowClone(prototypeElement);
+      table3.appendChild(clonedRow);
+    }
+  }
+
+  // Validate resulting structure
+  validateQuotationDocumentStructure(dom);
+
+  // Return refreshed item row targets
+  return extractTable3Targets(table3).itemRows;
+}
+
+export const generateItemRows = prepareItemRows;
+

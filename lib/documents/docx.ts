@@ -12,10 +12,14 @@ import {
 import {
   extractDocumentTargets,
   getChildElements,
+  prepareItemRows,
+  validateQuotationDocumentStructure,
+  createCleanItemRowClone,
 } from "./targets.ts";
 import type {
   DocumentTargetMap,
   ItemRowPrototype,
+  Table3ItemRowTarget,
 } from "./types.ts";
 
 if (typeof window !== "undefined") {
@@ -33,11 +37,28 @@ export class WorkingDocument {
   private readonly zip: JSZip;
   private readonly dom: Document;
   private readonly xmlEntryPath: string;
+  private readonly prototypeRowElement: Element;
 
   constructor(zip: JSZip, dom: Document, xmlEntryPath = "word/document.xml") {
     this.zip = zip;
     this.dom = dom;
     this.xmlEntryPath = xmlEntryPath;
+
+    const tables = this.getTables();
+    if (tables.length >= 3) {
+      const t3Rows = getChildElements(tables[2], "w:tr");
+      if (t3Rows.length >= 2) {
+        this.prototypeRowElement = createCleanItemRowClone(t3Rows[1]);
+      } else {
+        throw new DocumentStructureError(
+          `Table 3 requires at least 2 rows for prototype capture, found ${t3Rows.length}`
+        );
+      }
+    } else {
+      throw new DocumentStructureError(
+        `Document requires at least 3 tables, found ${tables.length}`
+      );
+    }
   }
 
   /**
@@ -134,6 +155,72 @@ export class WorkingDocument {
   public getItemRowPrototype(): ItemRowPrototype {
     const targets = this.getTargets();
     return targets.table3.prototype;
+  }
+
+  /**
+   * Prepares the quotation item rows dynamically to match the requested itemCount.
+   * Fully idempotent, reconfigurable, and validated.
+   */
+  public prepareItemRows(itemCount: number): Table3ItemRowTarget[] {
+    return prepareItemRows(this.dom, itemCount, this.prototypeRowElement);
+  }
+
+  /**
+   * Alias for prepareItemRows.
+   */
+  public generateItemRows(itemCount: number): Table3ItemRowTarget[] {
+    return this.prepareItemRows(itemCount);
+  }
+
+  /**
+   * Returns current ordered item row targets from Table 3.
+   */
+  public getItemRows(): Table3ItemRowTarget[] {
+    const targets = this.getTargets();
+    return targets.table3.itemRows;
+  }
+
+  /**
+   * Returns Table 3 header row element.
+   */
+  public getHeaderRow(): Element {
+    const targets = this.getTargets();
+    return targets.table3.headerRow;
+  }
+
+  /**
+   * Returns Table 4 total row element.
+   */
+  public getTotalRow(): Element {
+    const targets = this.getTargets();
+    return targets.table4.rowElement;
+  }
+
+  /**
+   * Returns all rows of the quotation item and total compound table structure in order:
+   * [Header, Item 1, ..., Item N, Total Row].
+   */
+  public getQuotationTableRows(): Element[] {
+    const headerRow = this.getHeaderRow();
+    const itemRows = this.getItemRows().map((target) => target.rowElement);
+    const totalRow = this.getTotalRow();
+    return [headerRow, ...itemRows, totalRow];
+  }
+
+  /**
+   * Confirms that the total row structurally follows all item rows as the final row of the quotation table area.
+   */
+  public isTotalRowLast(): boolean {
+    const quotationRows = this.getQuotationTableRows();
+    const totalRow = this.getTotalRow();
+    return quotationRows.length > 0 && quotationRows[quotationRows.length - 1] === totalRow;
+  }
+
+  /**
+   * Validates document table structure against canonical layout rules.
+   */
+  public validateDocumentStructure(): void {
+    validateQuotationDocumentStructure(this.dom);
   }
 
   /**

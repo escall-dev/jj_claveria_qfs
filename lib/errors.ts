@@ -26,6 +26,13 @@ export class ValidationError extends AppError {
   }
 }
 
+export class DocumentItemCountError extends ValidationError {
+  constructor(message: string) {
+    super(message);
+    this.name = "DocumentItemCountError";
+  }
+}
+
 export class DatabaseError extends AppError {
   public readonly originalError?: unknown;
 
