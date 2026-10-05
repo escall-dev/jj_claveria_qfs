@@ -78,6 +78,15 @@ export {
 } from "./exporter.ts";
 export type { QuotationExportResult } from "./exporter.ts";
 
+// Re-export PDF conversion and export functions
+export {
+  resolveLibreOfficePath,
+  convertDocxToPdf,
+  generateQuotationPdf,
+  getQuotationPdfFilename,
+  processQuotationPdfExport,
+} from "./pdf.ts";
+
 // Re-export document types
 export type {
   TemplateMetadata,

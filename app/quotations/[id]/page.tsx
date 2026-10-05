@@ -84,6 +84,17 @@ export default async function QuotationDetailPage({
               </svg>
               <span>Export DOCX</span>
             </a>
+            <a
+              href={`/quotations/${quotation.id}/export/pdf`}
+              download={`${quotation.qf_number}.pdf`}
+              id="export-pdf-button"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-rose-600 dark:border-rose-500 bg-rose-50 dark:bg-rose-950/60 px-3.5 py-1.5 text-xs font-semibold text-rose-700 dark:text-rose-300 hover:bg-rose-100 dark:hover:bg-rose-900/60 transition-colors shadow-xs"
+            >
+              <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+              </svg>
+              <span>Export PDF</span>
+            </a>
             <Link
               href="/quotations/new"
               className="inline-flex items-center gap-1.5 rounded-lg bg-zinc-900 dark:bg-zinc-100 px-3.5 py-1.5 text-xs font-semibold text-white dark:text-zinc-900 hover:bg-zinc-800 dark:hover:bg-zinc-200 transition-colors shadow-xs"
@@ -238,7 +249,7 @@ export default async function QuotationDetailPage({
         {/* Document Roadmap Preview Notice */}
         <div className="rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700 p-4 text-center">
           <p className="text-xs text-zinc-500 dark:text-zinc-400">
-            Official DOCX export is active. PDF export and advanced preview workflows will be available in subsequent phases (Phase 15–16).
+            Official DOCX and PDF exports are active. Advanced preview workflows will be available in subsequent phases (Phase 16).
           </p>
         </div>
       </div>
