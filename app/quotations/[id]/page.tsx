@@ -40,9 +40,8 @@ export default async function QuotationDetailPage({
   }
 
   return (
-    <main className="min-h-screen bg-zinc-50 dark:bg-zinc-950 p-4 sm:p-6 lg:p-8">
-      <div className="max-w-5xl mx-auto space-y-6">
-        {/* Navigation Breadcrumbs & Top Actions */}
+    <div className="space-y-6">
+      {/* Navigation Breadcrumbs & Top Actions */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div className="flex items-center gap-2 text-xs">
             <Link
@@ -270,7 +269,6 @@ export default async function QuotationDetailPage({
           itemCount={quotation.items.length}
           totalAmount={quotation.total_amount}
         />
-      </div>
-    </main>
+    </div>
   );
 }

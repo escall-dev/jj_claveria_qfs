@@ -20,16 +20,14 @@ export default async function NewQuotationPage() {
   const activeUoms = await listActiveUoms();
 
   return (
-    <main className="min-h-screen lg:h-screen lg:max-h-screen lg:overflow-hidden bg-zinc-50 dark:bg-zinc-950 p-2 sm:p-2.5 md:p-3 flex flex-col">
-      <div className="w-full max-w-[1600px] mx-auto flex-1 flex flex-col min-h-0">
-        <QuotationForm
-          initialUoms={activeUoms}
-          currentUser={{
-            displayName: session.displayName,
-            username: session.username,
-          }}
-        />
-      </div>
-    </main>
+    <div className="w-full mx-auto flex-1 flex flex-col min-h-0">
+      <QuotationForm
+        initialUoms={activeUoms}
+        currentUser={{
+          displayName: session.displayName,
+          username: session.username,
+        }}
+      />
+    </div>
   );
 }

@@ -15,9 +15,8 @@ export default async function CatalogPage() {
     ]);
 
   return (
-    <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 p-6 md:p-8">
-      <div className="max-w-5xl mx-auto space-y-6">
-        {/* Breadcrumb Navigation */}
+    <div className="space-y-6">
+      {/* Breadcrumb Navigation */}
         <div className="flex items-center gap-2 text-xs text-zinc-500">
           <Link href="/dashboard" className="hover:underline">
             Dashboard
@@ -114,6 +113,5 @@ export default async function CatalogPage() {
           </Link>
         </div>
       </div>
-    </div>
   );
 }
