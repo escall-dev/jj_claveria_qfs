@@ -85,6 +85,7 @@ export {
   generateQuotationPdf,
   getQuotationPdfFilename,
   processQuotationPdfExport,
+  processQuotationPdfPreview,
 } from "./pdf.ts";
 
 // Re-export document types

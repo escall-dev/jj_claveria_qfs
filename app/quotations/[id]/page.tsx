@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import { getQuotationById } from "@/lib/quotations";
 import { formatCurrency } from "@/lib/calculations";
+import { DocumentPreview } from "@/components/quotations";
 
 export async function generateMetadata({
   params,
@@ -73,6 +74,22 @@ export default async function QuotationDetailPage({
               </svg>
               <span>Back to History</span>
             </Link>
+            <a
+              href="#document-preview-section"
+              id="top-preview-button"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3.5 py-1.5 text-xs font-semibold text-zinc-800 dark:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors shadow-xs"
+            >
+              <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="2"
+                  d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+                />
+              </svg>
+              <span>Preview</span>
+            </a>
             <a
               href={`/quotations/${quotation.id}/export`}
               download={`${quotation.qf_number}.docx`}
@@ -246,12 +263,13 @@ export default async function QuotationDetailPage({
           </div>
         </section>
 
-        {/* Document Roadmap Preview Notice */}
-        <div className="rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700 p-4 text-center">
-          <p className="text-xs text-zinc-500 dark:text-zinc-400">
-            Official DOCX and PDF exports are active. Advanced preview workflows will be available in subsequent phases (Phase 16).
-          </p>
-        </div>
+        {/* Document Preview & Export Section (Phase 16) */}
+        <DocumentPreview
+          quotationId={quotation.id}
+          qfNumber={quotation.qf_number}
+          itemCount={quotation.items.length}
+          totalAmount={quotation.total_amount}
+        />
       </div>
     </main>
   );

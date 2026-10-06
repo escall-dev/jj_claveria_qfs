@@ -4,3 +4,5 @@
 
 export * from "./quotation-form";
 export * from "./quotation-item-row";
+export * from "./document-preview";
+

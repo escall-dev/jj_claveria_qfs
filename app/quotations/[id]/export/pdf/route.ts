@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
  * GET /quotations/[id]/export/pdf
  */
 export async function GET(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ id: string }> }
 ): Promise<Response> {
   const { id } = await params;
@@ -17,7 +17,14 @@ export async function GET(
   const quotation = id ? await getQuotationById(id.trim()) : null;
 
   try {
-    const result = await processQuotationPdfExport(session, quotation, id);
+    const url = new URL(request.url);
+    const isInline =
+      url.searchParams.get("inline") === "true" ||
+      url.searchParams.get("preview") === "true";
+
+    const result = await processQuotationPdfExport(session, quotation, id, {
+      disposition: isInline ? "inline" : "attachment",
+    });
     return new Response(result.body as BodyInit, {
       status: result.status,
       headers: result.headers,

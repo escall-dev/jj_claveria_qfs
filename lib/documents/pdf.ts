@@ -258,12 +258,13 @@ export async function generateQuotationPdf(
  * 2. Validates quotation ID parameter (400 if invalid).
  * 3. Validates quotation presence (404 if not found).
  * 4. Validates line items exist (400 if empty).
- * 5. Generates official PDF via Phase 14 DOCX source of truth and returns binary response with safe attachment headers.
+ * 5. Generates official PDF via Phase 14 DOCX source of truth and returns binary response with safe attachment or inline headers.
  */
 export async function processQuotationPdfExport(
   session: unknown | null,
   quotation: QuotationWithItems | null,
-  quotationId?: string | null
+  quotationId?: string | null,
+  options?: { disposition?: "attachment" | "inline" }
 ): Promise<QuotationExportResult> {
   // 1. Session authentication guard
   if (!session) {
@@ -304,12 +305,13 @@ export async function processQuotationPdfExport(
   // 5. Generate completed PDF
   const buffer = await generateQuotationPdf(quotation);
   const filename = getQuotationPdfFilename(quotation.qf_number);
+  const disposition = options?.disposition === "inline" ? "inline" : "attachment";
 
   return {
     status: 200,
     headers: {
       "Content-Type": "application/pdf",
-      "Content-Disposition": `attachment; filename="${filename}"; filename*=UTF-8''${encodeURIComponent(
+      "Content-Disposition": `${disposition}; filename="${filename}"; filename*=UTF-8''${encodeURIComponent(
         filename
       )}`,
       "Content-Length": buffer.byteLength.toString(),
@@ -318,3 +320,17 @@ export async function processQuotationPdfExport(
     body: new Uint8Array(buffer),
   };
 }
+
+/**
+ * Authoritative pipeline for handling quotation PDF preview requests.
+ * Uses the exact same PDF generation and security pipeline as export,
+ * but specifies inline Content-Disposition for embedded browser preview rendering.
+ */
+export async function processQuotationPdfPreview(
+  session: unknown | null,
+  quotation: QuotationWithItems | null,
+  quotationId?: string | null
+): Promise<QuotationExportResult> {
+  return processQuotationPdfExport(session, quotation, quotationId, { disposition: "inline" });
+}
+
