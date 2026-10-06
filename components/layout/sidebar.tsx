@@ -142,8 +142,9 @@ export function Sidebar({ isCollapsed, onToggleCollapse }: SidebarProps) {
     const linkContent = (
       <Link
         href={item.href}
+        aria-label={item.name}
         className={`group flex items-center rounded-lg px-3 py-2 text-xs font-medium transition-all ${
-          isCollapsed ? "justify-center" : "gap-3"
+          isCollapsed ? "justify-center w-full" : "gap-3"
         } ${
           isActive
             ? "bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 font-semibold"
@@ -159,7 +160,7 @@ export function Sidebar({ isCollapsed, onToggleCollapse }: SidebarProps) {
         >
           {item.icon}
         </span>
-        {!isCollapsed && <span className="truncate">{item.name}</span>}
+        <span className={isCollapsed ? "sr-only" : "truncate"}>{item.name}</span>
       </Link>
     );
 
@@ -177,37 +178,36 @@ export function Sidebar({ isCollapsed, onToggleCollapse }: SidebarProps) {
   return (
     <aside
       aria-label="Application Sidebar"
-      className={`hidden md:flex flex-col shrink-0 border-r border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/95 backdrop-blur-sm transition-all duration-200 select-none ${
-        isCollapsed ? "w-20" : "w-64"
+      className={`hidden md:flex flex-col shrink-0 border-r border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/95 backdrop-blur-sm transition-all duration-200 select-none overflow-x-hidden ${
+        isCollapsed ? "w-20 min-w-20 max-w-20" : "w-64 min-w-64 max-w-64"
       }`}
     >
       {/* Brand Identity Header */}
       <div className="flex h-16 items-center px-4 border-b border-zinc-100 dark:border-zinc-800/80">
         <Link
           href="/dashboard"
+          aria-label="JJ Claveria Industrial Supplies - Dashboard"
           className={`flex items-center gap-3 overflow-hidden ${
-            isCollapsed ? "justify-center w-full" : ""
+            isCollapsed ? "justify-center w-full" : "min-w-0"
           }`}
         >
           {/* Minimal Brand Monogram Badge */}
           <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-600 text-white font-bold text-sm tracking-wider shadow-xs dark:bg-blue-600">
             JJ
           </div>
-          {!isCollapsed && (
-            <div className="flex flex-col min-w-0">
-              <span className="text-xs font-bold tracking-tight text-zinc-900 dark:text-zinc-100 truncate">
-                J.J. Claveria
-              </span>
-              <span className="text-[10px] text-zinc-500 dark:text-zinc-400 truncate">
-                Industrial Supplies • QFS
-              </span>
-            </div>
-          )}
+          <span className={isCollapsed ? "sr-only" : "flex flex-col min-w-0"}>
+            <span className="text-xs font-bold tracking-tight text-zinc-900 dark:text-zinc-100 truncate">
+              J.J. Claveria
+            </span>
+            <span className="text-[10px] text-zinc-500 dark:text-zinc-400 truncate">
+              Industrial Supplies • QFS
+            </span>
+          </span>
         </Link>
       </div>
 
       {/* Navigation Sections */}
-      <div className="flex-1 overflow-y-auto px-3 py-4 space-y-6">
+      <div className="flex-1 overflow-y-auto overflow-x-hidden px-3 py-4 space-y-6">
         {/* Main Section */}
         <div className="space-y-1">
           {!isCollapsed && (
@@ -242,7 +242,7 @@ export function Sidebar({ isCollapsed, onToggleCollapse }: SidebarProps) {
       {/* Sidebar Footer: Sign Out + Collapse Toggle */}
       <div className="p-3 border-t border-zinc-100 dark:border-zinc-800/80 space-y-1">
         {isCollapsed ? (
-          <Tooltip content="Sign Out" position="right">
+          <Tooltip content="Sign Out" position="right" className="w-full flex justify-center">
             <form action="/logout" method="POST" className="w-full flex justify-center">
               <button
                 type="submit"
@@ -269,27 +269,42 @@ export function Sidebar({ isCollapsed, onToggleCollapse }: SidebarProps) {
           </form>
         )}
 
-        <button
-          type="button"
-          onClick={onToggleCollapse}
-          aria-label={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
-          title={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
-          className={`flex w-full items-center rounded-lg px-3 py-2 text-xs font-medium text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800/60 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors cursor-pointer ${
-            isCollapsed ? "justify-center" : "gap-3"
-          }`}
-        >
-          <svg
-            className={`h-4 w-4 shrink-0 transition-transform duration-200 ${
-              isCollapsed ? "rotate-180" : ""
-            }`}
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
+        {isCollapsed ? (
+          <Tooltip content="Expand Sidebar" position="right" className="w-full">
+            <button
+              type="button"
+              onClick={onToggleCollapse}
+              aria-label="Expand sidebar"
+              className="flex w-full items-center justify-center rounded-lg px-3 py-2 text-xs font-medium text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800/60 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors cursor-pointer"
+            >
+              <svg
+                className="h-4 w-4 shrink-0 transition-transform duration-200 rotate-180"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
+              </svg>
+            </button>
+          </Tooltip>
+        ) : (
+          <button
+            type="button"
+            onClick={onToggleCollapse}
+            aria-label="Collapse sidebar"
+            className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-xs font-medium text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800/60 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors cursor-pointer"
           >
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
-          </svg>
-          {!isCollapsed && <span>Collapse Sidebar</span>}
-        </button>
+            <svg
+              className="h-4 w-4 shrink-0 transition-transform duration-200"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
+            </svg>
+            <span>Collapse Sidebar</span>
+          </button>
+        )}
       </div>
     </aside>
   );
