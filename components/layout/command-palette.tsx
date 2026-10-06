@@ -16,7 +16,7 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
   const navigationCommands = [
     { label: "Dashboard", href: "/dashboard", section: "Navigation", icon: "📊" },
     { label: "Quotations History", href: "/quotations", section: "Navigation", icon: "📄" },
-    { label: "Create New Quotation", href: "/quotations/new", section: "Actions", icon: "➕" },
+    { label: "Create New Quotation", href: "/quotations?new=1", section: "Actions", icon: "➕" },
     { label: "Customer Directory", href: "/customers", section: "Navigation", icon: "👥" },
     { label: "Catalog Hub", href: "/catalog", section: "Catalog", icon: "📁" },
     { label: "Products Catalog", href: "/catalog/products", section: "Catalog", icon: "📦" },

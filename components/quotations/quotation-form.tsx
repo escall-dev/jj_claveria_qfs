@@ -37,9 +37,24 @@ export interface QuotationFormProps {
     displayName: string;
     username: string;
   };
+  /** Callback fired after quotation is successfully persisted */
+  onSuccess?: (savedResult: { quotationId: string; qfNumber: string }) => void;
+  /** Callback fired when user cancels */
+  onCancel?: () => void;
+  /** Whether the form is rendered inside a modal */
+  isModal?: boolean;
+  /** Callback to notify parent whether the form has unsaved modifications */
+  onDirtyChange?: (isDirty: boolean) => void;
 }
 
-export function QuotationForm({ initialUoms, currentUser }: QuotationFormProps) {
+export function QuotationForm({
+  initialUoms,
+  currentUser,
+  onSuccess,
+  onCancel,
+  isModal = false,
+  onDirtyChange,
+}: QuotationFormProps) {
   // Counter to guarantee unique stable IDs for dynamically added rows on the client
   const rowCounterRef = React.useRef(1);
 
@@ -62,6 +77,27 @@ export function QuotationForm({ initialUoms, currentUser }: QuotationFormProps) 
     quotationId: string;
     qfNumber: string;
   } | null>(null);
+
+  // Track whether any quotation fields have been modified by the user
+  const isDirty = React.useMemo(() => {
+    return Boolean(
+      formData.companyName.trim() ||
+      formData.companyAddress.trim() ||
+      formData.contactPerson.trim() ||
+      formData.contactNumber.trim() ||
+      formData.qfNumber.trim() ||
+      formData.items.length > 1 ||
+      Boolean(formData.items[0]?.description?.trim()) ||
+      Boolean(formData.items[0]?.brandName?.trim()) ||
+      Boolean(formData.items[0]?.uom?.trim()) ||
+      Boolean(String(formData.items[0]?.unitPrice || "").trim()) ||
+      (formData.items[0] && formData.items[0].quantity !== "1")
+    );
+  }, [formData]);
+
+  React.useEffect(() => {
+    onDirtyChange?.(isDirty);
+  }, [isDirty, onDirtyChange]);
 
   // Field change handlers for header/company details
   const handleFieldChange = (
@@ -196,13 +232,19 @@ export function QuotationForm({ initialUoms, currentUser }: QuotationFormProps) 
         return;
       }
 
-      setSavedResult({
+      const quotationResult = {
         quotationId: saveResult.quotationId || "",
         qfNumber: saveResult.qfNumber || formData.qfNumber,
-      });
+      };
+
+      setSavedResult(quotationResult);
       setValidatedNotice(
-        `Quotation "${saveResult.qfNumber || formData.qfNumber}" saved successfully!`
+        `Quotation "${quotationResult.qfNumber}" saved successfully!`
       );
+
+      if (onSuccess) {
+        onSuccess(quotationResult);
+      }
     } catch {
       setValidationResult({
         success: false,
@@ -345,18 +387,26 @@ export function QuotationForm({ initialUoms, currentUser }: QuotationFormProps) 
       {/* SECTION 1: COMPACT HEADER (Title, Breadcrumbs, Date, QF#) */}
       <header className="rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 px-3 py-2 shadow-xs flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 flex-shrink-0">
         <div className="flex items-center gap-2 flex-wrap">
-          <nav aria-label="Breadcrumb" className="flex items-center gap-1 text-xs text-zinc-500">
-            <Link href="/dashboard" className="hover:underline">
-              Dashboard
-            </Link>
-            <span>/</span>
-            <Link href="/quotations" className="hover:underline">
-              Quotations
-            </Link>
-            <span>/</span>
-          </nav>
+          {isModal ? (
+            <div className="flex items-center gap-1.5 text-xs text-zinc-500">
+              <span className="font-semibold text-zinc-800 dark:text-zinc-200">
+                New Entry
+              </span>
+            </div>
+          ) : (
+            <nav aria-label="Breadcrumb" className="flex items-center gap-1 text-xs text-zinc-500">
+              <Link href="/dashboard" className="hover:underline">
+                Dashboard
+              </Link>
+              <span>/</span>
+              <Link href="/quotations" className="hover:underline">
+                Quotations
+              </Link>
+              <span>/</span>
+            </nav>
+          )}
           <h1 className="text-sm font-bold text-zinc-900 dark:text-zinc-50">
-            New Quotation
+            {isModal ? "Quotation Entry Form" : "New Quotation"}
           </h1>
           {currentUser && (
             <span className="hidden sm:inline-flex text-[11px] text-zinc-400 border-l border-zinc-200 dark:border-zinc-800 pl-2">
@@ -591,12 +641,22 @@ export function QuotationForm({ initialUoms, currentUser }: QuotationFormProps) 
       {/* SECTION 4: STICKY BOTTOM ACTION BAR */}
       <footer className="rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 px-3 py-2 shadow-xs flex items-center justify-between gap-3 flex-shrink-0">
         <div className="flex items-center gap-2">
-          <Link
-            href="/quotations"
-            className="rounded border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-1.5 text-xs font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors shadow-xs"
-          >
-            Cancel
-          </Link>
+          {onCancel ? (
+            <button
+              type="button"
+              onClick={onCancel}
+              className="rounded border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-1.5 text-xs font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors shadow-xs"
+            >
+              Cancel
+            </button>
+          ) : (
+            <Link
+              href="/quotations"
+              className="rounded border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-1.5 text-xs font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors shadow-xs"
+            >
+              Cancel
+            </Link>
+          )}
           <button
             type="button"
             onClick={handleAddItem}

@@ -23,7 +23,7 @@ export default async function DashboardPage() {
 
         <div className="flex items-center gap-3">
           <Link
-            href="/quotations/new"
+            href="/quotations?new=1"
             className="inline-flex items-center gap-1.5 rounded-lg bg-primary text-primary-foreground px-4 py-2 text-xs font-semibold hover:opacity-90 transition-opacity shadow-xs"
           >
             <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
